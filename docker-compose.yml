@@ -1,0 +1,82 @@
+version: "3.9"  # optional but recommended, no warnings
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - bank-net
+
+  eureka:
+    build:
+      context: ./EurekaServer
+    container_name: eureka
+    environment:
+      - SERVER_PORT=8761
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+    ports:
+      - "8762:8761"
+    networks:
+      - bank-net
+    depends_on:
+      - mongo
+
+  account-service:
+    build:
+      context: ./AccountService
+    container_name: account-service
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/account_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+    ports:
+      - "8081:8081"
+    networks:
+      - bank-net
+    depends_on:
+      - eureka
+      - mongo
+
+  transaction-service:
+    build:
+      context: ./TransactionService
+    container_name: transaction-service
+    environment:
+      - SERVER_PORT=8082
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/trans_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+    ports:
+      - "8082:8082"
+    networks:
+      - bank-net
+    depends_on:
+      - eureka
+      - mongo
+      - account-service
+
+  notification-service:
+    build:
+      context: ./NotificationService
+    container_name: notification-service
+    environment:
+      - SERVER_PORT=8083
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+    ports:
+      - "8083:8083"
+    networks:
+      - bank-net
+    depends_on:
+      - eureka
+
+volumes:
+  mongo-data:
+
+networks:
+  bank-net:
+    driver: bridge
